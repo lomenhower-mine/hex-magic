@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="ru"><head><meta charset="utf-8"><title>Hex Runes</title>
+<style>
+html,body{margin:0;height:100%;overflow:hidden;background:#0b0b16;font:13px system-ui,sans-serif;color:#e8e4ff}
+canvas{display:block}#g{position:fixed;inset:0;display:none;background:rgba(8,6,20,.82);cursor:crosshair}
+.p{position:fixed;background:rgba(10,8,25,.7);border:1px solid #5b4b9a;border-radius:8px;padding:8px 10px}
+#help{left:10px;top:10px;line-height:1.5;max-width:330px;font-size:12px}#help b{color:#c9b6ff}
+#bars{left:50%;bottom:14px;transform:translateX(-50%);width:260px}
+.bar{height:10px;background:#222;border-radius:5px;margin:4px 0;overflow:hidden}.bar i{display:block;height:100%}
+#stack{right:10px;top:10px;min-width:150px}#toast{left:50%;top:14px;transform:translateX(-50%);display:none}
+#log{right:10px;bottom:10px;max-width:240px;font-size:12px}
+#cross{position:fixed;left:50%;top:50%;width:6px;height:6px;margin:-3px;border-radius:50%;background:#fff8;pointer-events:none}
+
+.ov{position:fixed;inset:0;z-index:50;display:none;align-items:center;justify-content:center;background:radial-gradient(#150f3a99,#05030fdd)}
+.pg{display:none;max-width:90vw}.pg.on{display:block}
+.box{background:#0f0b26ee;border:1px solid #6d5bd0;border-radius:14px;padding:22px 28px;min-width:300px;max-height:88vh;overflow:auto;box-shadow:0 0 40px #5b3fd055}
+h1{margin:0 0 14px;text-align:center;letter-spacing:3px;color:#d4c6ff;text-shadow:0 0 14px #8a6bff;font-size:24px}
+.box button{display:block;width:100%;margin:8px 0;padding:10px;background:#2a2060;color:#eee;border:1px solid #7a68e0;border-radius:8px;font-size:15px;cursor:pointer}
+.box button:hover{background:#4a38a8}.box input[type=text]{width:100%;box-sizing:border-box;padding:10px;background:#0a0720;color:#fff;border:1px solid #7a68e0;border-radius:8px;font-size:15px}
+.tabs{display:flex;gap:6px}.tabs button{width:auto;flex:1;margin:0 0 10px}.tabs .on{background:#6a4fe0}
+.wide{width:min(820px,86vw)}.card{display:flex;gap:12px;align-items:center;padding:8px;margin:6px 0;background:#1a1440;border-radius:8px;font-size:12px;line-height:1.5}
+.card canvas{background:#0a0720;border-radius:6px;flex:none}.steps{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}.steps div{text-align:center;font-size:10px;width:72px}
+code{background:#000a;padding:1px 5px;border-radius:4px;color:#ffd36b}.row{display:flex;justify-content:space-between;align-items:center;margin:10px 0;gap:12px}
+#flash{position:fixed;inset:0;z-index:40;pointer-events:none;opacity:0;transition:opacity .5s}#hint{left:10px;bottom:10px;font-size:12px}
+</style></head><body>
+<div id="cross"></div>
+<div id="stack" class="p"><b>Стек</b><div id="st">пусто</div></div>
+<div id="toast" class="p"></div><div id="log" class="p"></div>
+<div id="bars" class="p">❤<div class="bar"><i id="hp" style="background:#e55;width:100%"></i></div>
+✦ медиа<div class="bar"><i id="mn" style="background:#6af;width:100%"></i></div></div>
+<div id="hint" class="p">Esc меню · G гримуар · F руны</div><div id="flash"></div>
+<div id="ov" class="ov"><div class="box">
+<div id="m-main" class="pg"><h1>✦ HEX RUNES ✦</h1><input id="nm" type="text" maxlength="16" placeholder="Имя мага"><button id="b-play">Играть</button><button data-go="m-grim">Гримуар</button><button data-go="m-opt">Настройки</button><button data-go="m-ctl">Управление</button></div>
+<div id="m-pause" class="pg"><h1>Пауза</h1><button id="b-res">Продолжить</button><button data-go="m-grim">Гримуар</button><button data-go="m-opt">Настройки</button><button data-go="m-ctl">Управление</button><button onclick="location.reload()">Выйти в меню</button></div>
+<div id="m-opt" class="pg"><h1>Настройки</h1><div class="row">Громкость<input id="o-vol" type="range" min="0" max="100"></div><div class="row">Чувствительность мыши<input id="o-sens" type="range" min="30" max="250"></div>
+<div class="row">Частицы и эффекты<input id="o-fx" type="checkbox"></div><div class="row">Фоновая музыка<input id="o-mus" type="checkbox"></div><button data-back>Назад</button></div>
+<div id="m-ctl" class="pg"><h1>Управление</h1><div class="card"><div><b>WASD</b> ходьба · <b>Пробел</b> прыжок · <b>Мышь</b> обзор<br><b>F</b> открыть/закрыть руны (рисуйте зажав мышь по точкам)<br><b>G</b> гримуар · <b>Esc</b> меню паузы<br>Закрытие рун сбрасывает стек.</div></div><button data-back>Назад</button></div>
+<div id="m-grim" class="pg wide"><h1>Гримуар</h1><div class="tabs"><button data-tab="how">Основы</button><button data-tab="pats">Узоры</button><button data-tab="spells">Заклинания</button></div><div id="gb"></div><button data-back>Назад</button></div>
+</div></div>
+<canvas id="g"></canvas>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+let name='Маг',playing=false,ui=null,prevUI='',shake=0,lastHp=100,o0={};try{o0=JSON.parse(localStorage.getItem('hr_opt')||'{}')}catch{}
+const opt=Object.assign({vol:.6,sens:1,fx:true,music:true},o0);
+let ws=null;
+const $=id=>document.getElementById(id);
+let myId=null,casting=false,toastT;
+const toast=(t,bad)=>{const e=$('toast');e.textContent=t;e.style.color=bad?'#ff8a8a':'#b8ffb8';e.style.display='block';clearTimeout(toastT);toastT=setTimeout(()=>e.style.display='none',2500)};
+const logm=t=>{const l=$('log');l.innerHTML=t+'<br>'+l.innerHTML.split('<br>').slice(0,4).join('<br>')};
+// ---- three ----
+const R=new THREE.WebGLRenderer({antialias:true});R.setSize(innerWidth,innerHeight);document.body.prepend(R.domElement);
+const S=new THREE.Scene();S.background=new THREE.Color(0x14102a);S.fog=new THREE.Fog(0x14102a,20,110);
+const C=new THREE.PerspectiveCamera(75,innerWidth/innerHeight,.1,300);C.rotation.order='YXZ';
+S.add(new THREE.HemisphereLight(0xaab0ff,0x221a40,.9));const dl=new THREE.DirectionalLight(0xffffff,.6);dl.position.set(20,40,10);S.add(dl);
+const gc=document.createElement('canvas');gc.width=gc.height=128;{const x=gc.getContext('2d');x.fillStyle='#1d1838';x.fillRect(0,0,128,128);x.strokeStyle='#4a3d8f';x.lineWidth=2;x.strokeRect(0,0,128,128)}
+const gt=new THREE.CanvasTexture(gc);gt.wrapS=gt.wrapT=THREE.RepeatWrapping;gt.repeat.set(50,50);
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(200,200),new THREE.MeshLambertMaterial({map:gt}));ground.rotation.x=-Math.PI/2;S.add(ground);
+const pillars=[];for(let i=0;i<14;i++){const a=i/14*6.28,d=28+(i%3)*14,x=Math.cos(a)*d,z=Math.sin(a)*d;
+  const m=new THREE.Mesh(new THREE.CylinderGeometry(1.2,1.2,8,10),new THREE.MeshLambertMaterial({color:0x6a5acd,emissive:0x1a1040}));m.position.set(x,4,z);S.add(m);pillars.push({x,z,r:1.2})}
+const lights=[0,1,2].map(()=>{const l=new THREE.PointLight(0xffe9a0,0,25);S.add(l);return{l,t:0}});let li=0;
+const fxs=[];
+function label(t){const c=document.createElement('canvas');c.width=256;c.height=64;const x=c.getContext('2d');x.font='bold 34px sans-serif';x.fillStyle='#fff';x.textAlign='center';x.fillText(t,128,44);
+  const s=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c),transparent:true}));s.scale.set(2,.5,1);s.position.y=2.3;return s}
+const others=new Map();
+function mkPlayer(p){const g=new THREE.Group(),m=new THREE.MeshLambertMaterial({color:p.c});
+  const b=new THREE.Mesh(new THREE.CylinderGeometry(.4,.4,1.2,10),m);b.position.y=.8;const h=new THREE.Mesh(new THREE.SphereGeometry(.3,12,12),m);h.position.y=1.65;
+  const n=new THREE.Mesh(new THREE.BoxGeometry(.1,.1,.3),new THREE.MeshBasicMaterial({color:0xffffff}));n.position.set(0,1.65,-.35);
+  g.add(b,h,n,label(p.n));S.add(g);return g}
+// ---- state ----
+const me={p:new THREE.Vector3(0,1.6,0),v:new THREE.Vector3(),yaw:0,pt:0,ground:true};const keys={};
+addEventListener('keydown',e=>{if(e.target.tagName==='INPUT')return;keys[e.code]=true;if(e.code==='KeyF'&&myId!==null&&!ui)toggleCast();if(e.code==='KeyG'&&playing){ui==='m-grim'?backUI():ui?0:showPage('m-grim','')}if(e.code==='Escape'&&ui&&ui!=='m-main'&&ui!=='m-pause')backUI()});addEventListener('keyup',e=>keys[e.code]=false);
+R.domElement.addEventListener('click',()=>{if(!casting)R.domElement.requestPointerLock()});
+addEventListener('mousemove',e=>{if(document.pointerLockElement){me.yaw-=e.movementX*.0025*opt.sens;me.pt=Math.max(-1.5,Math.min(1.5,me.pt-e.movementY*.0025*opt.sens))}});
+addEventListener('resize',()=>{R.setSize(innerWidth,innerHeight);C.aspect=innerWidth/innerHeight;C.updateProjectionMatrix();G.width=innerWidth;G.height=innerHeight});
+// ---- network ----
+function connect(){ws=new WebSocket((location.protocol==='https:'?'wss://':'ws://')+location.host);ws.onopen=()=>ws.send(JSON.stringify({t:'join',name}));ws.onmessage=onMsg}
+function onMsg(ev){const m=JSON.parse(ev.data);
+  if(m.t==='init'){myId=m.id;me.p.set(...m.pos)}
+  else if(m.t==='resp'){me.p.set(...m.pos);me.v.set(0,0,0);toast('Вы погибли и возродились',1);flash('#a00');snd.bad()}
+  else if(m.t==='imp'){me.v.add(new THREE.Vector3(...m.v));me.ground=false;snd.whoosh();burst([me.p.x,me.p.y-1,me.p.z],40,0x9de0ff,3,.7,0);shake=Math.max(shake,.05)}
+  else if(m.t==='msg')logm(m.m);
+  else if(m.t==='s'){if(m.hp<lastHp-.5){flash('#c00');snd.hurt()}lastHp=m.hp;$('hp').style.width=Math.max(0,m.hp)+'%';$('mn').style.width=m.mana+'%';const seen=new Set();
+    m.ps.forEach(p=>{if(p.id===myId)return;seen.add(p.id);let o=others.get(p.id);if(!o){o={g:mkPlayer(p),t:new THREE.Vector3(...p.p),y:0};others.set(p.id,o);o.g.position.set(p.p[0],p.p[1]-1.6,p.p[2])}
+      o.t.set(...p.p);o.y=p.y});
+    others.forEach((o,id)=>{if(!seen.has(id)){S.remove(o.g);others.delete(id)}})}
+  else if(m.t==='cast'){$('st').innerHTML=m.stack.length?m.stack.map((x,i)=>(m.stack.length-i)+'. '+x).reverse().reverse().join('<br>'):'пусто';
+    toast(m.ok?'✓ '+m.n:'✗ Мишап ('+m.n+'): '+m.err,!m.ok);if(m.n!=='Сессия закрыта')m.ok?snd.ok():snd.bad()}
+  else if(m.t==='fx'){if(m.k==='cast'){const oo=others.get(m.id),o=m.id===myId?me.p:(oo&&oo.g.position);if(o){ring(o,m.ok?0x9d8cff:0xff4040);burst([o.x,1.2,o.z],30,m.ok?0xb9a8ff:0xff6060,2.5,.8,-1)}}else if(m.k==='boom'){boomFx(m.p,m.r);const s=new THREE.Mesh(new THREE.SphereGeometry(1,16,12),new THREE.MeshBasicMaterial({color:0xff8a30,transparent:true,opacity:.8}));
+      s.position.set(...m.p);S.add(s);fxs.push({s,r:m.r,t:0,boom:1})}
+    else{const s=new THREE.Mesh(new THREE.SphereGeometry(.3,10,10),new THREE.MeshBasicMaterial({color:0xfff2b0}));s.position.set(...m.p);S.add(s);
+      burst(m.p,25,0xfff2b0,3,.9,0);snd.sparkle();const L=lights[li++%3];L.l.position.set(...m.p);L.l.intensity=1.4;L.t=30;fxs.push({s,t:30,boom:0})}}};
+setInterval(()=>{if(ws&&ws.readyState===1&&myId!==null)ws.send(JSON.stringify({t:'m',p:[me.p.x,me.p.y,me.p.z],y:me.yaw,pt:me.pt}))},50);
+// ---- rune grid ----
+const G=$('g'),gx=G.getContext('2d');G.width=innerWidth;G.height=innerHeight;
+const SZ=48,DIRS=[[1,0],[0,1],[-1,1],[-1,0],[0,-1],[1,-1]],pts=[];
+for(let q=-3;q<=3;q++)for(let r=-3;r<=3;r++)if(Math.abs(q+r)<=3)pts.push({q,r});
+const pp=p=>({x:G.width/2+SZ*Math.sqrt(3)*(p.q+p.r/2),y:G.height/2+SZ*1.5*p.r});
+let path=[],used=new Set(),mouse={x:0,y:0};
+const ek=(a,b)=>[a.q+','+a.r,b.q+','+b.r].sort().join('|');
+const nearest=(x,y,m)=>{let b=null,bd=m;pts.forEach(p=>{const c=pp(p),d=Math.hypot(c.x-x,c.y-y);if(d<bd){bd=d;b=p}});return b};
+function toggleCast(){casting=!casting;G.style.display=casting?'block':'none';path=[];used.clear();
+  if(casting){document.exitPointerLock();for(const k in keys)keys[k]=false}else{ws.send(JSON.stringify({t:'close'}));R.domElement.requestPointerLock()}}
+G.onmousedown=e=>{const p=nearest(e.clientX,e.clientY,24);if(p)path=[p];used.clear()};
+G.onmousemove=e=>{mouse={x:e.clientX,y:e.clientY};if(!path.length)return;const l=path[path.length-1],p=nearest(e.clientX,e.clientY,24);
+  if(p&&(p!==l)&&DIRS.some(d=>l.q+d[0]===p.q&&l.r+d[1]===p.r)&&!used.has(ek(l,p))){used.add(ek(l,p));path.push(p);snd.node(path.length)}};
+G.onmouseup=()=>{if(path.length>=2){const ds=[];for(let i=1;i<path.length;i++){const dq=path[i].q-path[i-1].q,dr=path[i].r-path[i-1].r;ds.push(DIRS.findIndex(d=>d[0]===dq&&d[1]===dr))}
+    let s='';for(let i=1;i<ds.length;i++)s+='wedsaq'[(ds[i]-ds[i-1]+6)%6];ws.send(JSON.stringify({t:'pat',p:s}))}
+  path=[];used.clear()};
+function drawGrid(){if(!casting)return;gx.clearRect(0,0,G.width,G.height);
+  pts.forEach(p=>{const c=pp(p);gx.fillStyle='#9d8cff';gx.beginPath();gx.arc(c.x,c.y,5,0,6.3);gx.fill()});
+  if(path.length){gx.strokeStyle='#ffd36b';gx.lineWidth=5;gx.shadowColor='#ffb02e';gx.shadowBlur=14;gx.lineCap='round';gx.beginPath();
+    path.forEach((p,i)=>{const c=pp(p);i?gx.lineTo(c.x,c.y):gx.moveTo(c.x,c.y)});const l=pp(path[path.length-1]);gx.lineTo(mouse.x,mouse.y);gx.stroke();gx.shadowBlur=0}}
+// ---- audio ----
+let AC,master,nb,amb;
+function ac(){if(!AC){AC=new(window.AudioContext||window.webkitAudioContext)();master=AC.createGain();master.gain.value=opt.vol;master.connect(AC.destination)}if(AC.state==='suspended')AC.resume();return AC}
+function tone(f,d,ty='sine',v=.2,f2=f,dl=0){const a=ac(),o=a.createOscillator(),g=a.createGain(),t=a.currentTime+dl;o.type=ty;o.frequency.setValueAtTime(f,t);o.frequency.exponentialRampToValueAtTime(Math.max(20,f2),t+d);
+  g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(v,t+.01);g.gain.exponentialRampToValueAtTime(.001,t+d);o.connect(g);g.connect(master);o.start(t);o.stop(t+d+.05)}
+function noise(d,v,f0,f1){const a=ac();if(!nb){nb=a.createBuffer(1,a.sampleRate*2,a.sampleRate);const D=nb.getChannelData(0);for(let i=0;i<D.length;i++)D[i]=Math.random()*2-1}
+  const s=a.createBufferSource(),f=a.createBiquadFilter(),g=a.createGain(),t=a.currentTime;s.buffer=nb;f.type='lowpass';f.frequency.setValueAtTime(f0,t);f.frequency.exponentialRampToValueAtTime(f1,t+d);
+  g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(.001,t+d);s.connect(f);f.connect(g);g.connect(master);s.start(t);s.stop(t+d)}
+const snd={click:()=>tone(660,.08,'triangle',.12,880),node:n=>tone(280+n*55,.14,'sine',.15),jump:()=>tone(250,.15,'sine',.08,500),hurt:()=>tone(220,.25,'square',.12,70),
+ ok:()=>[523,659,784,1047].forEach((f,i)=>tone(f,.4,'sine',.1,f,i*.06)),bad:()=>{tone(140,.4,'sawtooth',.14,50);noise(.3,.15,900,200)},
+ boom:g=>{noise(1.3,.8*g,1400,60);tone(90,.9,'sine',.7*g,28)},whoosh:()=>noise(.6,.25,300,3000),
+ sparkle:()=>[1200,1600,2000,2600].forEach((f,i)=>tone(f,.3,'sine',.05,f*1.2,i*.05))};
+function ambient(){if(amb)return;ac();const g=AC.createGain();g.gain.value=opt.music?.04:0;g.connect(master);
+  [55,82.4,110.5].forEach(f=>{const o=AC.createOscillator();o.frequency.value=f;o.connect(g);o.start()});amb={g};
+  setInterval(()=>{if(opt.music&&playing&&!ui&&Math.random()<.6)tone([523,587,659,784,880][Math.random()*5|0],2,'sine',.04)},4500)}
+document.addEventListener('click',e=>{if(e.target.closest('.box button'))snd.click()});
+// ---- effects ----
+const MP=900,pg=new THREE.BufferGeometry(),pos=new Float32Array(MP*3),col=new Float32Array(MP*3),parts=[],rings=[];
+pg.setAttribute('position',new THREE.BufferAttribute(pos,3));pg.setAttribute('color',new THREE.BufferAttribute(col,3));
+const pm=new THREE.Points(pg,new THREE.PointsMaterial({size:.4,vertexColors:true,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false}));pm.frustumCulled=false;S.add(pm);
+function burst(p,n,color,sp,life,grav){if(!opt.fx)return;const c=new THREE.Color(color),P0=Array.isArray(p)?p:[p.x,p.y,p.z];
+  for(let i=0;i<n&&parts.length<MP;i++)parts.push({p:new THREE.Vector3(...P0),v:new THREE.Vector3(Math.random()-.5,Math.random()-.5,Math.random()-.5).normalize().multiplyScalar(sp*(.3+Math.random())),l:life,m:life,g:grav,c})}
+function ring(p,color){const m=new THREE.Mesh(new THREE.RingGeometry(.5,.7,40),new THREE.MeshBasicMaterial({color,transparent:true,opacity:.9,side:THREE.DoubleSide,blending:THREE.AdditiveBlending,depthWrite:false}));
+  m.rotation.x=-Math.PI/2;m.position.set(p.x,.06,p.z);S.add(m);rings.push({m,t:0})}
+function boomFx(p,r){burst(p,150,0xff8a30,r*3.5,.9,6);burst(p,60,0xffe0a0,r*5,.5,0);ring({x:p[0],z:p[2]},0xff8a30);
+  const d=me.p.distanceTo(new THREE.Vector3(...p));snd.boom(1/(1+d/15));shake=Math.max(shake,Math.min(.5,r*.15/(1+d/8)));if(d<r){flash('#fb5')}}
+function flash(c){const f=$('flash');f.style.transition='none';f.style.background=c;f.style.opacity=.45;requestAnimationFrame(()=>requestAnimationFrame(()=>{f.style.transition='opacity .5s';f.style.opacity=0}))}
+function updFx(dt){
+  for(let i=rings.length-1;i>=0;i--){const r=rings[i];r.t+=dt;const u=r.t/.9;r.m.scale.setScalar(1+u*5);r.m.material.opacity=.9*(1-u);if(u>=1){S.remove(r.m);rings.splice(i,1)}}
+  if(playing&&Math.random()<.5)burst([me.p.x+(Math.random()-.5)*30,Math.random()*6,me.p.z+(Math.random()-.5)*30],1,0x8a7bff,.3,5,-.05);
+  for(let i=parts.length-1;i>=0;i--){const q=parts[i];q.l-=dt;if(q.l<=0){parts.splice(i,1);continue}q.v.y-=q.g*dt;q.p.addScaledVector(q.v,dt)}
+  parts.forEach((q,i)=>{const k=q.l/q.m;pos[i*3]=q.p.x;pos[i*3+1]=q.p.y;pos[i*3+2]=q.p.z;col[i*3]=q.c.r*k;col[i*3+1]=q.c.g*k;col[i*3+2]=q.c.b*k});
+  pg.attributes.position.needsUpdate=pg.attributes.color.needsUpdate=true;pg.setDrawRange(0,parts.length);
+  if(shake>0){shake=Math.max(0,shake-dt*.8);C.position.x+=(Math.random()-.5)*shake;C.position.y+=(Math.random()-.5)*shake}
+  if(!playing){const t=performance.now()/7000;C.position.set(Math.cos(t)*16,7,Math.sin(t)*16);C.lookAt(0,3,0)}}
+// ---- menu & grimoire ----
+const PATS=[
+'qaq|Отражение разума|→ сущность|Кладёт в стек вас самого.',
+'wa|Взор|→ вектор|Единичный вектор вашего взгляда.',
+'wq|Позиция|сущность → точка|Положение сущности (глаза мага).',
+'ww|Число 1|→ число|Кладёт 1. Остальные числа собирайте дублированием и сложением.',
+'wd|Сложение|a b → a+b|Складывает два числа или два вектора.',
+'ee|Умножение|вектор/число, число → результат|Масштабирует вектор или умножает числа.',
+'ed|Дубликат|a → a a|Копирует верхнее значение.',
+'da|Обмен|a b → b a|Меняет два верхних значения местами.',
+'ea|Сброс|a →|Выбрасывает верхнее значение.',
+'dq|Луч|точка, вектор → точка|Точка, где луч из точки по вектору упрётся в землю (до 40).',
+'aaq|Взрыв|точка, мощность →|Мощность 0.5–4, медиа 15×мощность, радиус 2+1.5×мощность. Бьёт и толкает.',
+'dde|Импульс|сущность, вектор →|Толкает сущность. Медиа 5+длина вектора (макс. 30).',
+'qqa|Свет|точка →|Светящийся шар на 30 секунд. 5 медиа.'];
+const NM={};PATS.forEach(x=>{const a=x.split('|');NM[a[0]]=a[1]});
+const SPELLS=[
+['Рывок вперёд','Вы толкаете себя вдоль взгляда с силой 8.','qaq wa ww ed wd ed wd ed wd ee dde'],
+['Взрыв в точке взгляда','Луч до земли, затем взрыв мощности 2. Стоит 30 медиа.','qaq wq wa dq ww ed wd aaq'],
+['Мощный взрыв','Та же цепочка, но мощность 4 (60 медиа).','qaq wq wa dq ww ed wd ed wd aaq'],
+['Ракетный прыжок','Взрыв под собой подбрасывает вас, но и ранит.','qaq wq ww ed wd aaq'],
+['Светляк','Ставит светящийся шар туда, куда вы смотрите.','qaq wq wa dq qqa']];
+const HOW='<div class="card"><div><b>Как читать узоры.</b> Узор — линия по точкам сетки. Каждый поворот записывается буквой: <code>w</code> прямо, <code>e</code> вправо на 60°, <code>d</code> вправо на 120°, <code>q</code> влево на 60°, <code>a</code> влево на 120°. Направление первой линии неважно.<br><br><b>Стек.</b> Узоры исполняются сразу и работают со стеком значений (справа в игре). Действия забирают значения из стека.<br><br><b>Медиа.</b> Заклинания расходуют медиа, оно восстанавливается само. <b>Мишап</b> (ошибка, нехватка медиа, цель дальше 40) очищает стек и отнимает 10 медиа.<br><br>Сначала подготовьте значения, затем примените действие.</div></div>';
+function mini(code,w=84,h=64){const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d'),tn={w:0,e:1,d:2,s:3,a:4,q:5};let d=0,px=1,py=0;const P=[[0,0],[1,0]];
+  for(const ch of code){d=(d+tn[ch])%6;px+=Math.cos(d*Math.PI/3);py+=Math.sin(d*Math.PI/3);P.push([px,py])}
+  const xs=P.map(p=>p[0]),ys=P.map(p=>p[1]),a=Math.min(...xs),b=Math.max(...xs),c2=Math.min(...ys),e=Math.max(...ys);
+  const s=Math.min((w-16)/Math.max(.5,b-a),(h-16)/Math.max(.5,e-c2),26),ox=w/2-(a+b)/2*s,oy=h/2-(c2+e)/2*s;
+  x.strokeStyle='#ffd36b';x.lineWidth=3;x.lineCap='round';x.shadowColor='#ffb02e';x.shadowBlur=8;x.beginPath();P.forEach((p,i)=>x[i?'lineTo':'moveTo'](p[0]*s+ox,p[1]*s+oy));x.stroke();x.shadowBlur=0;
+  P.forEach((p,i)=>{x.fillStyle=i?'#9d8cff':'#6f6';x.beginPath();x.arc(p[0]*s+ox,p[1]*s+oy,i?2.5:4,0,6.3);x.fill()});return c}
+let gtab='how';
+function grim(tab){gtab=tab;const b=$('gb');b.innerHTML='';document.querySelectorAll('[data-tab]').forEach(t=>t.classList.toggle('on',t.dataset.tab===tab));
+  if(tab==='how')b.innerHTML=HOW;
+  else if(tab==='pats')PATS.forEach(x=>{const[c,n,st,ds]=x.split('|'),d=document.createElement('div');d.className='card';d.append(mini(c));const t=document.createElement('div');t.innerHTML='<b>'+n+'</b> <code>'+c+'</code><br><i>'+st+'</i><br>'+ds;d.append(t);b.append(d)});
+  else SPELLS.forEach(([n,ds,seq])=>{const d=document.createElement('div');d.className='card';const t=document.createElement('div');t.innerHTML='<b>'+n+'</b><br>'+ds;
+    const st=document.createElement('div');st.className='steps';seq.split(' ').forEach((c,i)=>{const u=document.createElement('div');u.append(mini(c,70,54));u.append((i+1)+'. '+NM[c]);st.append(u)});t.append(st);d.append(t);b.append(d)})}
+const pages=[...document.querySelectorAll('.pg')];
+function showPage(id,from){ui=id;prevUI=from||'';$('ov').style.display='flex';pages.forEach(p=>p.classList.toggle('on',p.id===id));if(id==='m-grim')grim(gtab);if(document.pointerLockElement)document.exitPointerLock()}
+function hideUI(){ui=null;$('ov').style.display='none';if(playing&&!casting)R.domElement.requestPointerLock()}
+function backUI(){prevUI?showPage(prevUI,''):hideUI()}
+document.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>showPage(b.dataset.go,ui));
+document.querySelectorAll('[data-back]').forEach(b=>b.onclick=backUI);
+document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>grim(b.dataset.tab));
+$('b-res').onclick=hideUI;
+try{$('nm').value=localStorage.getItem('hr_name')||''}catch{}
+$('b-play').onclick=()=>{name=($('nm').value||'Маг').slice(0,16);try{localStorage.setItem('hr_name',name)}catch{}playing=true;connect();ac();ambient();hideUI()};
+document.addEventListener('pointerlockchange',()=>{if(!document.pointerLockElement&&playing&&!casting&&!ui)showPage('m-pause','')});
+const sv=()=>{try{localStorage.setItem('hr_opt',JSON.stringify(opt))}catch{}};
+$('o-vol').value=opt.vol*100;$('o-sens').value=opt.sens*100;$('o-fx').checked=opt.fx;$('o-mus').checked=opt.music;
+$('o-vol').oninput=e=>{opt.vol=e.target.value/100;if(master)master.gain.value=opt.vol;sv()};
+$('o-sens').oninput=e=>{opt.sens=e.target.value/100;sv()};
+$('o-fx').onchange=e=>{opt.fx=e.target.checked;sv()};
+$('o-mus').onchange=e=>{opt.music=e.target.checked;if(amb)amb.g.gain.value=opt.music?.04:0;sv()};
+showPage('m-main','');
+// ---- loop ----
+let T=performance.now();
+(function loop(n){requestAnimationFrame(loop);const dt=Math.min(.05,(n-T)/1000);T=n;
+  let fx=0,fz=0;if(!casting&&!ui&&playing){if(keys.KeyW)fz--;if(keys.KeyS)fz++;if(keys.KeyA)fx--;if(keys.KeyD)fx++}
+  const l=Math.hypot(fx,fz)||1,s=Math.sin(me.yaw),c=Math.cos(me.yaw);
+  const tx=(fx*c+fz*s)/l*7,tz=(-fx*s+fz*c)/l*7,k=Math.min(1,(me.ground?12:.8)*dt);
+  me.v.x+=(tx-me.v.x)*k;me.v.z+=(tz-me.v.z)*k;
+  if(keys.Space&&me.ground&&!casting&&!ui&&playing){me.v.y=9;me.ground=false;snd.jump()}
+  me.v.y-=25*dt;me.p.addScaledVector(me.v,dt);
+  if(me.p.y<=1.6){me.p.y=1.6;if(me.v.y<0)me.v.y=0;me.ground=true}else me.ground=false;
+  pillars.forEach(q=>{const dx=me.p.x-q.x,dz=me.p.z-q.z,d=Math.hypot(dx,dz);if(d<q.r+.4&&me.p.y<9){me.p.x=q.x+dx/d*(q.r+.4);me.p.z=q.z+dz/d*(q.r+.4)}});
+  me.p.x=Math.max(-95,Math.min(95,me.p.x));me.p.z=Math.max(-95,Math.min(95,me.p.z));
+  C.position.copy(me.p);C.rotation.set(me.pt,me.yaw,0);
+  others.forEach(o=>{o.g.position.x+=(o.t.x-o.g.position.x)*.3;o.g.position.y+=(o.t.y-1.6-o.g.position.y)*.3;o.g.position.z+=(o.t.z-o.g.position.z)*.3;o.g.rotation.y=o.y});
+  for(let i=fxs.length-1;i>=0;i--){const f=fxs[i];f.t+=f.boom?dt:-dt;
+    if(f.boom){const u=f.t/.5;f.s.scale.setScalar(.2+f.r*Math.min(1,u));f.s.material.opacity=.8*(1-Math.min(1,u));if(u>=1){S.remove(f.s);fxs.splice(i,1)}}
+    else if(f.t<=0){S.remove(f.s);fxs.splice(i,1)}}
+  lights.forEach(L=>{if(L.t>0){L.t-=dt;if(L.t<=0)L.l.intensity=0}});
+  updFx(dt);R.render(S,C);drawGrid()})(T);
+</script></body></html>
